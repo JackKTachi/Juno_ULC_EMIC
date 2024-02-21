@@ -72,7 +72,7 @@ def fgm_spec(sts_file_path, window):
 
 """ 
 file_path = '/mnt/d/JUNO_data/FGM/PERI-02/fgm_jno_l3_2016269pc_v01.sts' # set your file paht
-window = 1024
+window = 1024 # set the fft window size
 
 fgm_spec(file_path, window)
 pytplot.tplot(['juno_mag_norm', f'juno_spec_{window}', 'juno_orbit'])
