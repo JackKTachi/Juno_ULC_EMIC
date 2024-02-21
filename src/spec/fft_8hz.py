@@ -75,6 +75,5 @@ window = 256
 
 fgm_spec(file_path, window)
 pytplot.tplot(['juno_mag_norm', f'juno_spec_{window}', 'juno_orbit'])
-
  """
 
