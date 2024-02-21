@@ -1,0 +1,14 @@
+\begindata
+KERNELS_TO_LOAD=(
+'kernel/de434s.bsp',
+'kernel/pck00010.tpc',
+'kernel/naif0012.tls',
+'kernel/jup310.bsp',
+'kernel/juno_v12.tf',
+'kernel/juno_struct_v04.bsp',
+'kernel/JNO_SCLKSCET.00061.tsc',
+'kernel/spk_rec_160522_160729_160909.bsp',
+'kernel/spk_rec_160729_160923_161027.bsp',
+'kernel/spk_rec_170422_170608_170621.bsp'
+)
+\begintext
