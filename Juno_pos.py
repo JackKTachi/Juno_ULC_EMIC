@@ -3,28 +3,19 @@
 import numpy as np
 import math
 import spiceypy as spice
+import datetime
 
-# temp
-
-# Juno's position relative to the magnetic field represented by the VIP4 field model [km].
-spice.furnsh('kernel/cassMetaK.txt')
-jun_et = spice.str2et('2016 189 // 0:0:0.648')
-pos, lightTimes = spice.spkpos(
-    targ='JUNO', et=jun_et, ref='IAU_JUPITER', abcorr='none', obs='JUPITER'
-)
-# print(pos/RJ)
-rho = np.sqrt(pos[0]**2 + pos[1]**2)
-Z = pos[2]
+# Constants
+RJ = 71492000   # Jupiter's equatorial radius [m]
 
 
 def S3(pos_arr):
     """
     Args:
-        pos_arr (1d-ndarray): object position in IAU_JUPITER [m]
+        pos_arr (1d-ndarray): object position in IAU_JUPITER (planet centric) [m]
 
     Returns:
         Sys3: System III longitude of the object [deg]
-        posphi: longitude in S3RH [deg]
     """
 
     posx, posy, posz = pos_arr[0], pos_arr[1], pos_arr[2]
@@ -36,35 +27,71 @@ def S3(pos_arr):
     else:
         Sys3 = np.degrees(2*np.pi - posphi)
 
-    return Sys3, np.degrees(posphi)
+    return Sys3
 
 
-def lt(utc):
-    """_summary_
-
+def Clat(pos_arr):
+    """
     Args:
-        utc: observation date
+        pos_arr (1d-ndarray): object position in IAU_JUPITER (planet centric) [m]
 
     Returns:
-        elong: east longitude of Europa (0 is defined at the anti-solar position) [deg]
-        td: local time [sec]
+        Clat: centrifugal latitude of the object [deg] (0 = centrifugal equator)
     """
+    posx, posy, posz = pos_arr[0], pos_arr[1], pos_arr[2]
+    R = math.sqrt(posx**2 + posy**2 + posz**2)
+    theta = np.arccos(posz/R)
+    phi = np.arctan2(posy, posx)
 
-    # The sun's position seen from the Jupiter in IAU_JUPITER coordinate.
-    posSUN, _ = spice.spkpos(
-        targ='SUN', et=utc, ref='IAU_JUPITER', abcorr='LT+S', obs='JUPITER'
+    # https://doi.org/10.1029/2020JA028713
+    a, b, c, d, e = 1.66, 0.131, 1.62, 7.76, 249
+    CL = (a*math.tanh(b*R/RJ-c)+d) * \
+        math.sin(math.radians(math.degrees(phi)-159.2-e))
+    Clat = 90-math.degrees(theta)-CL
+
+    return Clat
+
+
+def lt_iauJup(self, TARGET: str, utc):
+    """
+    Args:
+        TARGET: target in the Jupiter system (like EUROPA and JUNO)
+        utc: observation date at the target (UT)
+
+    Returns:
+        td: local time in datetime [hh:mm:ss]
+    """
+    et = spice.str2et(utc)
+
+    # Eigen vector toward the sun's position seen from Jupiter in IAU_JUPITER coordinate.
+    posSUN, lighttime = spice.spkpos(
+        targ='SUN', et=et, ref='IAU_JUPITER', abcorr='LT+S', obs='JUPITER'
     )
+    posSUN = posSUN/math.sqrt(posSUN[0]**2 + posSUN[1]**2 + posSUN[2]**2)
 
-    # Europa's position seen from the Jupiter in IAU_JUPITER coordinate.
-    posEUR, _ = spice.spkpos(
-        targ='EUROPA', et=utc, ref='IAU_JUPITER', abcorr='NONE', obs='JUPITER'
+    # Eigen vector toward target's position seen from Jupiter in IAU_JUPITER coordinate.
+    posTARG, _ = spice.spkpos(
+        targ=TARGET, et=et, ref='IAU_JUPITER', abcorr='NONE', obs='JUPITER'
     )
+    posTARG = posTARG / \
+        math.sqrt(posTARG[0]**2 + posTARG[1]**2 + posTARG[2]**2)
 
-    dot = posSUN[0]*1+posSUN[1]*0
-    R_SUN = math.sqrt(posSUN[0]**2+posSUN[1]**2+posSUN[2]**2)
-    arg = math.degrees(math.acos(dot/(R_SUN)))
+    # Dusk terminator
+    dusk_term = np.array([-posSUN[1], posSUN[0]])
+    dusk_dot = dusk_term[0]*posTARG[0] + dusk_term[1]*posTARG[1]
+    if dusk_dot >= 0:
+        # Target is in the dusk side.
+        d_phi = np.pi + \
+            math.acos(posSUN[0]*posTARG[0]+posSUN[1]*posTARG[1])
+        print('Dusk [deg]:', math.degrees(d_phi))
+    else:
+        # Target is in the dawn side.
+        d_phi = np.pi - \
+            math.acos(posSUN[0]*posTARG[0] + posSUN[1]*posTARG[1])
+        print('Dawn [deg]:', math.degrees(d_phi))
 
-    sec = (3600*24/360)*arg    # [sec]
-    # print(elong)
-    # print(td)
-    return arg, sec
+    sec = (3600*24/360)*math.degrees(d_phi)    # [sec]
+    td = datetime.timedelta(seconds=sec)
+    print(td)
+
+    return td
